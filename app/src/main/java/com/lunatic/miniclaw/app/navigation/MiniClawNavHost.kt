@@ -30,10 +30,7 @@ fun MiniClawNavHost() {
             arguments = listOf(navArgument(SESSION_ID_ARG) { type = NavType.StringType })
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString(SESSION_ID_ARG).orEmpty()
-            ChatRoute(
-                sessionId = sessionId,
-                onBackClicked = { navController.popBackStack() }
-            )
+            ChatRoute(sessionId = sessionId)
         }
     }
 }

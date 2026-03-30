@@ -24,3 +24,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "MiniClaw"
 include(":app")
+include(":data")
+include(":core:di")
+include(":core:domain")
+include(":feature:chat")
+include(":feature:sessionlist")
