@@ -5,10 +5,11 @@ import androidx.room.Room
 import com.lunatic.miniclaw.data.local.db.MiniClawDatabase
 import com.lunatic.miniclaw.data.local.preferences.ProviderPreferencesStore
 import com.lunatic.miniclaw.data.local.secure.ProviderSecretStore
+import com.lunatic.miniclaw.data.remote.model.minimax.api.MiniMaxApiServiceFactory
+import com.lunatic.miniclaw.data.remote.model.minimax.provider.MiniMaxChatModelProvider
 import com.lunatic.miniclaw.data.remote.datasource.ChatRemoteDataSource
 import com.lunatic.miniclaw.data.remote.datasource.FakeChatRemoteDataSource
 import com.lunatic.miniclaw.data.remote.model.provider.ChatModelProviderRegistry
-import com.lunatic.miniclaw.data.remote.model.provider.FakeChatModelProvider
 import com.lunatic.miniclaw.data.repository.LocalChatRepository
 import com.lunatic.miniclaw.data.repository.LocalSessionRepository
 import com.lunatic.miniclaw.data.repository.model.LocalModelProviderRepository
@@ -31,8 +32,9 @@ val dataKoinModule: Module = module {
     single { get<MiniClawDatabase>().messageDao() }
     single { ProviderPreferencesStore(get<Context>()) }
     single { ProviderSecretStore(get<Context>()) }
+    single { MiniMaxApiServiceFactory() }
     single<ChatRemoteDataSource> { FakeChatRemoteDataSource() }
-    single<ChatModelProvider> { FakeChatModelProvider(get()) }
+    single<ChatModelProvider> { MiniMaxChatModelProvider(get()) }
     single { ChatModelProviderRegistry(providers = getAll()) }
     single<SessionRepository> { LocalSessionRepository(get(), get()) }
     single<ChatRepository> { LocalChatRepository(get(), get(), get(), get()) }

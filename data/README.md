@@ -12,6 +12,7 @@
   - Provider 敏感配置：`data/local/secure/ProviderSecretStore.kt`。
 - 远端数据源：`data/remote/*`。
 - Provider 注册：`data/remote/model/provider/*`。
+- MiniMax 接入：`data/remote/model/minimax/*`（API、DTO、请求映射、Provider 实现）。
 - 仓储实现：`data/repository/LocalSessionRepository.kt`、`data/repository/LocalChatRepository.kt`、`data/repository/model/LocalModelProviderRepository.kt`。
 - 可用性校验与错误映射：`data/repository/model/ProviderConfigValidator.kt`、`ModelErrorMapper.kt`、`ModelAvailabilityStorageMapper.kt`。
 
