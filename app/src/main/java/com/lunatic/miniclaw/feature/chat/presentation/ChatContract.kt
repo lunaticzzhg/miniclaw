@@ -1,6 +1,7 @@
 package com.lunatic.miniclaw.feature.chat.presentation
 
 import com.lunatic.miniclaw.domain.chat.model.MessageRole
+import com.lunatic.miniclaw.domain.chat.model.MessageStatus
 
 data class ChatUiState(
     val title: String = "新会话",
@@ -15,5 +16,7 @@ data class ChatMessageItemUiModel(
     val id: String,
     val role: MessageRole,
     val content: String,
-    val statusText: String?
+    val status: MessageStatus,
+    val statusText: String?,
+    val showRetry: Boolean
 )

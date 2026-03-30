@@ -66,6 +66,22 @@ class ChatViewModel(
         }
     }
 
+    fun onRetryUserMessageClicked(messageId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                chatRepository.retryUserMessage(messageId)
+            }
+        }
+    }
+
+    fun onRetryAssistantMessageClicked(messageId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                chatRepository.retryAssistantMessage(messageId)
+            }
+        }
+    }
+
     private fun observeSession() {
         viewModelScope.launch {
             sessionRepository.observeSession(sessionId).collectLatest { session ->
@@ -90,7 +106,10 @@ class ChatViewModel(
                                 id = message.id,
                                 role = message.role,
                                 content = message.content,
-                                statusText = message.status.toStatusText()
+                                status = message.status,
+                                statusText = message.status.toStatusText(),
+                                showRetry = message.status == MessageStatus.SEND_FAILED ||
+                                    message.status == MessageStatus.FAILED
                             )
                         },
                         canStop = activeAssistant != null,

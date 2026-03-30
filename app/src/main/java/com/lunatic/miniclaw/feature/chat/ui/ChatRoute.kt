@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -18,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lunatic.miniclaw.domain.chat.model.MessageRole
 import com.lunatic.miniclaw.feature.chat.presentation.ChatViewModel
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -65,6 +67,20 @@ fun ChatRoute(
                     if (message.statusText != null) {
                         Text(text = message.statusText)
                     }
+                    if (message.showRetry) {
+                        Button(
+                            onClick = {
+                                if (message.role == MessageRole.USER) {
+                                    viewModel.onRetryUserMessageClicked(message.id)
+                                } else {
+                                    viewModel.onRetryAssistantMessageClicked(message.id)
+                                }
+                            }
+                        ) {
+                            Text(text = "重试")
+                        }
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(top = 6.dp))
                 }
             }
 

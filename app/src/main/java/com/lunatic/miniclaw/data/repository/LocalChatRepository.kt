@@ -44,14 +44,10 @@ class LocalChatRepository(
     }
 
     override suspend fun sendUserMessage(sessionId: String, text: String) {
-        if (activeSessionRequests.containsKey(sessionId)) {
-            return
-        }
+        if (activeSessionRequests.containsKey(sessionId)) return
 
         val normalized = text.trim()
-        if (normalized.isEmpty()) {
-            return
-        }
+        if (normalized.isEmpty()) return
 
         val session = sessionDao.getById(sessionId) ?: return
         val now = System.currentTimeMillis()
@@ -62,43 +58,86 @@ class LocalChatRepository(
             requestId = requestId,
             role = MessageRole.USER.name,
             content = normalized,
-            status = MessageStatus.SENT.name,
+            status = MessageStatus.SENDING.name,
             createdAt = now,
             updatedAt = now
         )
-        val assistantMessage = MessageEntity(
-            id = UUID.randomUUID().toString(),
-            sessionId = sessionId,
-            requestId = requestId,
-            role = MessageRole.ASSISTANT.name,
-            content = "",
-            status = MessageStatus.THINKING.name,
-            createdAt = now,
-            updatedAt = now
-        )
-
-        val nextTitle = if (session.title == DEFAULT_SESSION_TITLE) {
-            normalized.take(TITLE_MAX_LEN)
-        } else {
-            session.title
-        }
 
         database.withTransaction {
             messageDao.insert(userMessage)
-            messageDao.insert(assistantMessage)
             sessionDao.updateSummary(
                 sessionId = sessionId,
-                title = nextTitle,
+                title = resolveNextTitle(session.title, normalized),
                 preview = normalized,
                 updatedAt = now
             )
         }
 
-        startStreaming(
+        submitAndStartStreaming(
             sessionId = sessionId,
+            userMessage = userMessage,
             requestId = requestId,
-            assistantMessageId = assistantMessage.id,
-            userText = normalized
+            userText = normalized,
+            assistantMessageId = null
+        )
+    }
+
+    override suspend fun retryUserMessage(messageId: String) {
+        val userMessage = messageDao.getById(messageId) ?: return
+        if (userMessage.role != MessageRole.USER.name || userMessage.status != MessageStatus.SEND_FAILED.name) return
+        if (activeSessionRequests.containsKey(userMessage.sessionId)) return
+
+        val requestId = UUID.randomUUID().toString()
+        val resettingUser = userMessage.copy(
+            requestId = requestId,
+            status = MessageStatus.SENDING.name,
+            updatedAt = System.currentTimeMillis()
+        )
+        messageDao.update(resettingUser)
+
+        submitAndStartStreaming(
+            sessionId = userMessage.sessionId,
+            userMessage = resettingUser,
+            requestId = requestId,
+            userText = userMessage.content,
+            assistantMessageId = null
+        )
+    }
+
+    override suspend fun retryAssistantMessage(messageId: String) {
+        val assistant = messageDao.getById(messageId) ?: return
+        if (assistant.role != MessageRole.ASSISTANT.name || assistant.status != MessageStatus.FAILED.name) return
+        if (activeSessionRequests.containsKey(assistant.sessionId)) return
+
+        val relatedUserMessage = messageDao.getByRequestId(assistant.requestId.orEmpty())
+            .firstOrNull { it.role == MessageRole.USER.name }
+            ?: return
+
+        val newRequestId = UUID.randomUUID().toString()
+        database.withTransaction {
+            messageDao.update(
+                relatedUserMessage.copy(
+                    requestId = newRequestId,
+                    status = MessageStatus.SENT.name,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            messageDao.update(
+                assistant.copy(
+                    requestId = newRequestId,
+                    content = "",
+                    status = MessageStatus.THINKING.name,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+
+        submitAndStartStreaming(
+            sessionId = assistant.sessionId,
+            userMessage = relatedUserMessage.copy(requestId = newRequestId),
+            requestId = newRequestId,
+            userText = relatedUserMessage.content,
+            assistantMessageId = assistant.id
         )
     }
 
@@ -106,56 +145,103 @@ class LocalChatRepository(
         requestJobs[requestId]?.cancel()
     }
 
+    private suspend fun submitAndStartStreaming(
+        sessionId: String,
+        userMessage: MessageEntity,
+        requestId: String,
+        userText: String,
+        assistantMessageId: String?
+    ) {
+        val request = ChatStreamRequest(sessionId = sessionId, userText = userText)
+
+        try {
+            remoteDataSource.startChat(request)
+        } catch (_: Throwable) {
+            messageDao.update(
+                userMessage.copy(
+                    requestId = requestId,
+                    status = MessageStatus.SEND_FAILED.name,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+            return
+        }
+
+        var targetAssistantId = assistantMessageId
+        if (targetAssistantId == null) {
+            val assistant = MessageEntity(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                requestId = requestId,
+                role = MessageRole.ASSISTANT.name,
+                content = "",
+                status = MessageStatus.THINKING.name,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            database.withTransaction {
+                messageDao.update(
+                    userMessage.copy(
+                        requestId = requestId,
+                        status = MessageStatus.SENT.name,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+                messageDao.insert(assistant)
+            }
+            targetAssistantId = assistant.id
+        } else {
+            messageDao.update(
+                userMessage.copy(
+                    requestId = requestId,
+                    status = MessageStatus.SENT.name,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+
+        val finalAssistantId = targetAssistantId ?: return
+        startStreaming(
+            sessionId = sessionId,
+            requestId = requestId,
+            assistantMessageId = finalAssistantId,
+            request = request
+        )
+    }
+
     private fun startStreaming(
         sessionId: String,
         requestId: String,
         assistantMessageId: String,
-        userText: String
+        request: ChatStreamRequest
     ) {
         activeSessionRequests[sessionId] = requestId
 
         val job = repositoryScope.launch {
             try {
-                remoteDataSource.streamChat(
-                    ChatStreamRequest(sessionId = sessionId, userText = userText)
-                ).collect { event ->
+                remoteDataSource.streamChat(request).collect { event ->
                     when (event) {
                         is ChatStreamEvent.Started -> {
-                            updateAssistantStatus(
-                                assistantMessageId = assistantMessageId,
-                                status = MessageStatus.STREAMING
-                            )
+                            updateAssistantStatus(assistantMessageId, MessageStatus.STREAMING)
                         }
 
                         is ChatStreamEvent.Delta -> {
-                            appendAssistantDelta(
-                                assistantMessageId = assistantMessageId,
-                                textChunk = event.textChunk
-                            )
+                            appendAssistantDelta(assistantMessageId, event.textChunk)
                         }
 
                         is ChatStreamEvent.Completed -> {
-                            completeAssistantMessage(
-                                sessionId = sessionId,
-                                assistantMessageId = assistantMessageId
-                            )
+                            completeAssistantMessage(sessionId, assistantMessageId)
                         }
 
                         is ChatStreamEvent.Failed -> {
-                            failAssistantMessage(
-                                assistantMessageId = assistantMessageId
-                            )
+                            failAssistantMessage(assistantMessageId)
                         }
                     }
                 }
             } catch (_: CancellationException) {
-                stopAssistantMessage(
-                    assistantMessageId = assistantMessageId
-                )
+                stopAssistantMessage(assistantMessageId)
             } catch (_: Throwable) {
-                failAssistantMessage(
-                    assistantMessageId = assistantMessageId
-                )
+                failAssistantMessage(assistantMessageId)
             } finally {
                 requestJobs.remove(requestId)
                 activeSessionRequests.remove(sessionId, requestId)
@@ -165,23 +251,12 @@ class LocalChatRepository(
         requestJobs[requestId] = job
     }
 
-    private suspend fun updateAssistantStatus(
-        assistantMessageId: String,
-        status: MessageStatus
-    ) {
+    private suspend fun updateAssistantStatus(assistantMessageId: String, status: MessageStatus) {
         val entity = messageDao.getById(assistantMessageId) ?: return
-        messageDao.update(
-            entity.copy(
-                status = status.name,
-                updatedAt = System.currentTimeMillis()
-            )
-        )
+        messageDao.update(entity.copy(status = status.name, updatedAt = System.currentTimeMillis()))
     }
 
-    private suspend fun appendAssistantDelta(
-        assistantMessageId: String,
-        textChunk: String
-    ) {
+    private suspend fun appendAssistantDelta(assistantMessageId: String, textChunk: String) {
         val entity = messageDao.getById(assistantMessageId) ?: return
         messageDao.update(
             entity.copy(
@@ -192,50 +267,33 @@ class LocalChatRepository(
         )
     }
 
-    private suspend fun completeAssistantMessage(
-        sessionId: String,
-        assistantMessageId: String
-    ) {
+    private suspend fun completeAssistantMessage(sessionId: String, assistantMessageId: String) {
         val now = System.currentTimeMillis()
         val entity = messageDao.getById(assistantMessageId) ?: return
+        val finalContent = entity.content
         database.withTransaction {
-            messageDao.update(
-                entity.copy(
-                    status = MessageStatus.COMPLETED.name,
-                    updatedAt = now
-                )
-            )
+            messageDao.update(entity.copy(status = MessageStatus.COMPLETED.name, updatedAt = now))
             sessionDao.updateSummary(
                 sessionId = sessionId,
                 title = sessionDao.getById(sessionId)?.title ?: DEFAULT_SESSION_TITLE,
-                preview = entity.content,
+                preview = finalContent,
                 updatedAt = now
             )
         }
     }
 
-    private suspend fun stopAssistantMessage(
-        assistantMessageId: String
-    ) {
+    private suspend fun stopAssistantMessage(assistantMessageId: String) {
         val entity = messageDao.getById(assistantMessageId) ?: return
-        messageDao.update(
-            entity.copy(
-                status = MessageStatus.STOPPED.name,
-                updatedAt = System.currentTimeMillis()
-            )
-        )
+        messageDao.update(entity.copy(status = MessageStatus.STOPPED.name, updatedAt = System.currentTimeMillis()))
     }
 
-    private suspend fun failAssistantMessage(
-        assistantMessageId: String
-    ) {
+    private suspend fun failAssistantMessage(assistantMessageId: String) {
         val entity = messageDao.getById(assistantMessageId) ?: return
-        messageDao.update(
-            entity.copy(
-                status = MessageStatus.FAILED.name,
-                updatedAt = System.currentTimeMillis()
-            )
-        )
+        messageDao.update(entity.copy(status = MessageStatus.FAILED.name, updatedAt = System.currentTimeMillis()))
+    }
+
+    private fun resolveNextTitle(currentTitle: String, userText: String): String {
+        return if (currentTitle == DEFAULT_SESSION_TITLE) userText.take(TITLE_MAX_LEN) else currentTitle
     }
 
     private companion object {
