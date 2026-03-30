@@ -13,6 +13,7 @@
 - 远端数据源：`data/remote/*`。
 - Provider 注册：`data/remote/model/provider/*`。
 - 仓储实现：`data/repository/LocalSessionRepository.kt`、`data/repository/LocalChatRepository.kt`、`data/repository/model/LocalModelProviderRepository.kt`。
+- 可用性校验与错误映射：`data/repository/model/ProviderConfigValidator.kt`、`ModelErrorMapper.kt`、`ModelAvailabilityStorageMapper.kt`。
 
 ## 架构图
 - `domain repository interface <- data repository implementation -> local/remote data source`。

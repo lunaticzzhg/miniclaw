@@ -36,7 +36,7 @@ val dataKoinModule: Module = module {
     single { ChatModelProviderRegistry(providers = getAll()) }
     single<SessionRepository> { LocalSessionRepository(get(), get()) }
     single<ChatRepository> { LocalChatRepository(get(), get(), get(), get()) }
-    single<ModelProviderRepository> { LocalModelProviderRepository(get(), get()) }
+    single<ModelProviderRepository> { LocalModelProviderRepository(get(), get(), get()) }
 }
 
 private const val DATABASE_NAME = "miniclaw.db"

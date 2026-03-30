@@ -51,6 +51,13 @@ class ProviderPreferencesStore(
             .apply()
     }
 
+    fun updateLastValidationStatus(status: String?) {
+        sharedPreferences.edit()
+            .putString(KEY_LAST_VALIDATION_STATUS, status)
+            .putLong(KEY_UPDATED_AT, System.currentTimeMillis())
+            .apply()
+    }
+
     private companion object {
         private const val FILE_NAME = "provider_preferences"
         private const val KEY_CURRENT_PROVIDER_ID = "current_provider_id"

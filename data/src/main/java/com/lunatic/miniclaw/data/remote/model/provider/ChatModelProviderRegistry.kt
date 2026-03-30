@@ -8,6 +8,8 @@ class ChatModelProviderRegistry(
 ) {
     private val providerMap: Map<ModelProviderId, ChatModelProvider> = providers.associateBy { it.providerId }
 
+    fun find(providerId: ModelProviderId): ChatModelProvider? = providerMap[providerId]
+
     fun get(providerId: ModelProviderId): ChatModelProvider {
         return providerMap[providerId]
             ?: error("ChatModelProvider not registered for providerId=$providerId")
