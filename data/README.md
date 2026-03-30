@@ -8,9 +8,11 @@
 ## 核心类
 - DI：`data/di/DataKoinModule.kt`。
 - 本地存储：`data/local/*`。
+  - Provider 非敏感配置：`data/local/preferences/ProviderPreferencesStore.kt`。
+  - Provider 敏感配置：`data/local/secure/ProviderSecretStore.kt`。
 - 远端数据源：`data/remote/*`。
 - Provider 注册：`data/remote/model/provider/*`。
-- 仓储实现：`data/repository/LocalSessionRepository.kt`、`data/repository/LocalChatRepository.kt`。
+- 仓储实现：`data/repository/LocalSessionRepository.kt`、`data/repository/LocalChatRepository.kt`、`data/repository/model/LocalModelProviderRepository.kt`。
 
 ## 架构图
 - `domain repository interface <- data repository implementation -> local/remote data source`。
