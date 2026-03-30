@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.lunatic.miniclaw.domain.chat.model.MessageRole
 import com.lunatic.miniclaw.domain.chat.model.MessageStatus
 import com.lunatic.miniclaw.domain.chat.repository.ChatRepository
+import com.lunatic.miniclaw.domain.model.repository.ModelProviderRepository
 import com.lunatic.miniclaw.domain.session.repository.SessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -21,7 +23,8 @@ import kotlinx.coroutines.withContext
 class ChatViewModel(
     private val sessionId: String,
     private val sessionRepository: SessionRepository,
-    private val chatRepository: ChatRepository
+    private val chatRepository: ChatRepository,
+    private val modelProviderRepository: ModelProviderRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -32,6 +35,7 @@ class ChatViewModel(
     init {
         observeSession()
         observeMessages()
+        observeModelState()
     }
 
     fun onIntent(intent: ChatIntent) {
@@ -39,8 +43,15 @@ class ChatViewModel(
             is ChatIntent.InputChanged -> handleInputChanged(intent.text)
             ChatIntent.SendClicked -> handleSendClicked()
             ChatIntent.StopClicked -> handleStopClicked()
+            ChatIntent.ModelSwitcherClicked -> handleModelSwitcherClicked()
             is ChatIntent.RetryUserMessageClicked -> handleRetryUserMessage(intent.messageId)
             is ChatIntent.RetryAssistantMessageClicked -> handleRetryAssistantMessage(intent.messageId)
+        }
+    }
+
+    private fun handleModelSwitcherClicked() {
+        viewModelScope.launch {
+            _effects.emit(ChatEffect.NavigateToModelConfig(sessionId))
         }
     }
 
@@ -136,16 +147,21 @@ class ChatViewModel(
         }
     }
 
-    private fun MessageStatus.toStatusText(): String? {
-        return when (this) {
-            MessageStatus.SENDING -> "发送中"
-            MessageStatus.SENT -> null
-            MessageStatus.SEND_FAILED -> "发送失败"
-            MessageStatus.THINKING -> "思考中"
-            MessageStatus.STREAMING -> "回复中"
-            MessageStatus.COMPLETED -> null
-            MessageStatus.FAILED -> "回复失败"
-            MessageStatus.STOPPED -> "已停止"
+    private fun observeModelState() {
+        viewModelScope.launch {
+            modelProviderRepository.observeCurrentProvider()
+                .combine(modelProviderRepository.observeAvailability()) { provider, availability ->
+                    provider to availability
+                }
+                .collectLatest { (provider, availability) ->
+                    _uiState.update { state ->
+                        state.copy(
+                            currentProviderId = provider?.providerId,
+                            currentProviderLabel = provider?.providerId.toUiLabel(),
+                            availabilityText = availability.toUiText()
+                        )
+                    }
+                }
         }
     }
 }

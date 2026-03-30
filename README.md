@@ -10,6 +10,7 @@
 - `:data`：数据实现层，负责 Room、本地仓储实现与远端数据源接入。
 - `:core:domain`：领域模型与仓储契约。
 - `:feature:chat`：聊天页面与聊天交互表现层。
+- `:feature:modelconfig`：模型配置页面与配置交互表现层。
 - `:feature:sessionlist`：会话列表页面与会话交互表现层。
 
 ## 核心数据流

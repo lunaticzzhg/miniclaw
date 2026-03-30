@@ -44,6 +44,7 @@ dependencies {
     implementation(project(":core:di"))
     implementation(project(":core:domain"))
     implementation(project(":feature:chat"))
+    implementation(project(":feature:modelconfig"))
     implementation(project(":feature:sessionlist"))
 
     implementation(libs.androidx.core.ktx)

@@ -2,6 +2,7 @@ package com.lunatic.miniclaw.feature.chat.presentation
 
 import com.lunatic.miniclaw.domain.chat.model.MessageRole
 import com.lunatic.miniclaw.domain.chat.model.MessageStatus
+import com.lunatic.miniclaw.domain.model.model.ModelProviderId
 
 data class ChatUiState(
     val title: String = "新会话",
@@ -9,18 +10,24 @@ data class ChatUiState(
     val inputText: String = "",
     val canSend: Boolean = false,
     val canStop: Boolean = false,
-    val activeRequestId: String? = null
+    val activeRequestId: String? = null,
+    val currentProviderId: ModelProviderId? = null,
+    val currentProviderLabel: String = "模型",
+    val availabilityText: String? = null
 )
 
 sealed interface ChatIntent {
     data class InputChanged(val text: String) : ChatIntent
     data object SendClicked : ChatIntent
     data object StopClicked : ChatIntent
+    data object ModelSwitcherClicked : ChatIntent
     data class RetryUserMessageClicked(val messageId: String) : ChatIntent
     data class RetryAssistantMessageClicked(val messageId: String) : ChatIntent
 }
 
-sealed interface ChatEffect
+sealed interface ChatEffect {
+    data class NavigateToModelConfig(val sessionId: String) : ChatEffect
+}
 
 data class ChatMessageItemUiModel(
     val id: String,

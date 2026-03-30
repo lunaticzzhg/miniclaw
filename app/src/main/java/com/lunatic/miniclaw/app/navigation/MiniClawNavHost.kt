@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lunatic.miniclaw.feature.chat.ui.ChatRoute
+import com.lunatic.miniclaw.feature.modelconfig.ui.ModelConfigRoute
 import com.lunatic.miniclaw.feature.sessionlist.ui.SessionListRoute
 
 @Composable
@@ -30,9 +31,39 @@ fun MiniClawNavHost() {
             arguments = listOf(navArgument(SESSION_ID_ARG) { type = NavType.StringType })
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString(SESSION_ID_ARG).orEmpty()
-            ChatRoute(sessionId = sessionId)
+            ChatRoute(
+                sessionId = sessionId,
+                onNavigateToModelConfig = { sourceSessionId ->
+                    navController.navigate(NavRoute.modelConfig(sourceSessionId))
+                }
+            )
+        }
+
+        composable(
+            route = NavRoute.ModelConfig,
+            arguments = listOf(
+                navArgument(RETURN_TO_SESSION_ID_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val returnToSessionId = backStackEntry.arguments?.getString(RETURN_TO_SESSION_ID_ARG)
+            ModelConfigRoute(
+                onNavigateBack = {
+                    if (!navController.popBackStack()) {
+                        if (!returnToSessionId.isNullOrBlank()) {
+                            navController.navigate(NavRoute.chat(returnToSessionId))
+                        } else {
+                            navController.navigate(NavRoute.SessionList)
+                        }
+                    }
+                }
+            )
         }
     }
 }
 
 private const val SESSION_ID_ARG = "sessionId"
+private const val RETURN_TO_SESSION_ID_ARG = "returnToSessionId"
