@@ -19,11 +19,8 @@ fun MiniClawNavHost() {
     ) {
         composable(route = NavRoute.SessionList) {
             SessionListRoute(
-                onSessionClicked = { sessionId ->
+                onOpenChat = { sessionId ->
                     navController.navigate(NavRoute.chat(sessionId))
-                },
-                onCreateSessionClicked = {
-                    navController.navigate(NavRoute.chat(DEFAULT_SESSION_ID))
                 }
             )
         }
@@ -42,4 +39,3 @@ fun MiniClawNavHost() {
 }
 
 private const val SESSION_ID_ARG = "sessionId"
-private const val DEFAULT_SESSION_ID = "new"

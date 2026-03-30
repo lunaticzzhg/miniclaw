@@ -5,10 +5,13 @@
 - 开发语言统一使用 Kotlin。
 - 架构统一采用 MVI，分层固定为 `View -> ViewModel -> Repository -> DataSource`。
 - 跨模块依赖统一通过 Koin 注入，禁止手动跨模块直接 new 具体实现。
+- 禁止滥用依赖注入：仅在跨模块依赖场景使用 DI；模块内简单对象优先显式构造，避免“万物都进容器”。
+- ViewModel 统一使用 `koinViewModel` 注入，禁止手动构造或自定义 Factory 注入业务依赖。
 
 ## 组件化要求
 - 项目采用组件化架构，按功能或领域拆模块，模块边界清晰，避免“公共大杂烩”。
 - 模块间仅依赖稳定契约：UI state / intent / repository interface / model，禁止越层调用。
+- Koin Module 必须按功能/领域分散在对应模块内维护，禁止集中堆放到单一入口文件。
 - 每个模块必须维护自己的 README，内容只保留：模块职责、核心类、架构图、数据流。
 - 项目根 README 必须说明整体架构、模块关系、核心数据流。
 - README 必须高度凝练；模块代码改动涉及职责、核心类、数据流、依赖关系时，同步更新 README。
