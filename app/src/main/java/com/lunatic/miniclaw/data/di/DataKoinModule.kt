@@ -4,6 +4,8 @@ import androidx.room.Room
 import com.lunatic.miniclaw.data.local.db.MiniClawDatabase
 import com.lunatic.miniclaw.data.mapper.MessageEntityMapper
 import com.lunatic.miniclaw.data.mapper.SessionEntityMapper
+import com.lunatic.miniclaw.data.remote.datasource.ChatRemoteDataSource
+import com.lunatic.miniclaw.data.remote.datasource.FakeChatRemoteDataSource
 import com.lunatic.miniclaw.data.repository.LocalChatRepository
 import com.lunatic.miniclaw.data.repository.LocalSessionRepository
 import com.lunatic.miniclaw.domain.chat.repository.ChatRepository
@@ -23,8 +25,9 @@ val dataKoinModule: Module = module {
     single { get<MiniClawDatabase>().messageDao() }
     single { SessionEntityMapper() }
     single { MessageEntityMapper() }
+    single<ChatRemoteDataSource> { FakeChatRemoteDataSource() }
     single<SessionRepository> { LocalSessionRepository(get(), get(), get()) }
-    single<ChatRepository> { LocalChatRepository(get(), get(), get(), get()) }
+    single<ChatRepository> { LocalChatRepository(get(), get(), get(), get(), get()) }
 }
 
 private const val DATABASE_NAME = "miniclaw.db"

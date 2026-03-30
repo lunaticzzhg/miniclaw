@@ -60,7 +60,11 @@ fun ChatRoute(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(uiState.messages, key = { it.id }) { message ->
-                    Text(text = "${message.role}: ${message.content}")
+                    val content = if (message.content.isBlank()) "..." else message.content
+                    Text(text = "${message.role}: $content")
+                    if (message.statusText != null) {
+                        Text(text = message.statusText)
+                    }
                 }
             }
 
@@ -70,12 +74,21 @@ fun ChatRoute(
                 onValueChange = viewModel::onInputChanged,
                 label = { Text(text = "输入消息") }
             )
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.canSend,
-                onClick = viewModel::onSendClicked
-            ) {
-                Text(text = "发送")
+            if (uiState.canStop) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = viewModel::onStopClicked
+                ) {
+                    Text(text = "停止")
+                }
+            } else {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = uiState.canSend,
+                    onClick = viewModel::onSendClicked
+                ) {
+                    Text(text = "发送")
+                }
             }
         }
     }

@@ -2,6 +2,8 @@ package com.lunatic.miniclaw.feature.chat.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lunatic.miniclaw.domain.chat.model.MessageRole
+import com.lunatic.miniclaw.domain.chat.model.MessageStatus
 import com.lunatic.miniclaw.domain.chat.repository.ChatRepository
 import com.lunatic.miniclaw.domain.session.repository.SessionRepository
 import kotlinx.coroutines.Dispatchers
@@ -31,13 +33,17 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 inputText = text,
-                canSend = text.isNotBlank()
+                canSend = text.isNotBlank() && !it.canStop
             )
         }
     }
 
     fun onSendClicked() {
-        val text = _uiState.value.inputText.trim()
+        val current = _uiState.value
+        if (!current.canSend) {
+            return
+        }
+        val text = current.inputText.trim()
         if (text.isEmpty()) {
             return
         }
@@ -47,6 +53,15 @@ class ChatViewModel(
             }
             _uiState.update {
                 it.copy(inputText = "", canSend = false)
+            }
+        }
+    }
+
+    fun onStopClicked() {
+        val requestId = _uiState.value.activeRequestId ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                chatRepository.stopStreaming(requestId)
             }
         }
     }
@@ -64,18 +79,39 @@ class ChatViewModel(
     private fun observeMessages() {
         viewModelScope.launch {
             chatRepository.observeMessages(sessionId).collectLatest { messages ->
-                _uiState.update {
-                    it.copy(
+                val activeAssistant = messages.lastOrNull {
+                    it.role == MessageRole.ASSISTANT &&
+                        (it.status == MessageStatus.THINKING || it.status == MessageStatus.STREAMING)
+                }
+                _uiState.update { state ->
+                    state.copy(
                         messages = messages.map { message ->
                             ChatMessageItemUiModel(
                                 id = message.id,
                                 role = message.role,
-                                content = message.content
+                                content = message.content,
+                                statusText = message.status.toStatusText()
                             )
-                        }
+                        },
+                        canStop = activeAssistant != null,
+                        activeRequestId = activeAssistant?.requestId,
+                        canSend = state.inputText.isNotBlank() && activeAssistant == null
                     )
                 }
             }
+        }
+    }
+
+    private fun MessageStatus.toStatusText(): String? {
+        return when (this) {
+            MessageStatus.SENDING -> "发送中"
+            MessageStatus.SENT -> null
+            MessageStatus.SEND_FAILED -> "发送失败"
+            MessageStatus.THINKING -> "思考中"
+            MessageStatus.STREAMING -> "回复中"
+            MessageStatus.COMPLETED -> null
+            MessageStatus.FAILED -> "回复失败"
+            MessageStatus.STOPPED -> "已停止"
         }
     }
 }
