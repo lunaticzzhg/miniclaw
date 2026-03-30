@@ -5,6 +5,7 @@ import com.lunatic.miniclaw.data.remote.model.minimax.dto.MiniMaxMessageDto
 import com.lunatic.miniclaw.data.remote.model.minimax.mapper.MiniMaxErrorMapper
 import com.lunatic.miniclaw.data.remote.model.minimax.mapper.MiniMaxRequestBodyMapper
 import com.lunatic.miniclaw.data.remote.model.minimax.mapper.MiniMaxRequestMapper
+import com.lunatic.miniclaw.data.remote.model.minimax.mapper.MiniMaxStreamMapper
 import com.lunatic.miniclaw.data.remote.model.provider.ProviderHttpException
 import com.lunatic.miniclaw.domain.model.model.ChatModelRequest
 import com.lunatic.miniclaw.domain.model.model.ChatStreamEvent
@@ -26,6 +27,7 @@ class MiniMaxChatModelProvider(
     private val requestMapper = MiniMaxRequestMapper()
     private val requestBodyMapper = MiniMaxRequestBodyMapper()
     private val errorMapper = MiniMaxErrorMapper()
+    private val streamMapper = MiniMaxStreamMapper()
 
     override suspend fun validate(config: ModelProviderConfig): ModelAvailability {
         if (!isConfigReady(config)) return ModelAvailability.NotConfigured
@@ -49,11 +51,7 @@ class MiniMaxChatModelProvider(
             emit(ChatStreamEvent.Failed(throwable.toCallError()))
             return@flow
         }
-
-        if (rawBody.isNotBlank()) {
-            emit(ChatStreamEvent.Delta(rawBody))
-        }
-        emit(ChatStreamEvent.Completed)
+        streamMapper.toEvents(rawBody).forEach { event -> emit(event) }
     }
 
     private suspend fun execute(
