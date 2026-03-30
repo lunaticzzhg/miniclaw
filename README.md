@@ -16,3 +16,4 @@
 - 会话链路：`SessionListRoute -> SessionListViewModel -> SessionRepository -> Room -> Flow -> UI`。
 - 聊天链路：`ChatRoute -> ChatViewModel -> ChatRepository -> 本地数据库 + 远端流 -> Flow -> UI`。
 - 流式链路：`startChat -> 插入 assistant 思考中 -> 增量追加 delta -> 完成/失败/停止`。
+- Provider 链路：`ModelProviderId -> ChatModelProviderRegistry -> ChatModelProvider`（为多 Provider 可插拔预留）。
